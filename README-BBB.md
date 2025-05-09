@@ -95,7 +95,7 @@ Create an automated build script:
 
 ```bash
 #!/bin/bash
-# Initialize build environment and build BeagleBone Black image
+# Initialize build environment and build BeagleBone Black image build
 
 # Setup build environment
 source poky/oe-init-build-env build
