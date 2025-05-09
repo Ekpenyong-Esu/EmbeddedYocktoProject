@@ -15,7 +15,7 @@ INITSCRIPT_PARAMS = "start 99 5 . stop 20 0 1 6 ."
 
 EXTRA_OEMAKE += "KERNELDIR=${STAGING_KERNEL_DIR}"
 
-RPROVIDES:${PN} += "kernel-module-scull"
+RPROVIDES:${PN} += "kernel-module-scull-${KERNEL_VERSION}"
 
 do_compile() {
     oe_runmake -C ${S}/scull KERNELDIR=${STAGING_KERNEL_DIR}
@@ -39,5 +39,3 @@ do_install() {
 FILES:${PN} += "${base_libdir}/modules/${KERNEL_VERSION}/extra/scull.ko"
 FILES:${PN} += "${bindir}/*"
 FILES:${PN} += "${sysconfdir}/init.d/S99scull"
-
-KERNEL_MODULE_AUTOLOAD += "scull"

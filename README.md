@@ -18,98 +18,189 @@ Before starting, ensure you have the following installed on your Linux system:
 
 ## Creating the Build Script
 
-The build script (`build.sh`) is a crucial component that automates the setup and build process. Here's how to create it:
+The build script (`build.sh`) is a crucial component that automates the setup and build process. Here's the complete implementation:
 
-1. **Basic Script Structure**
+1. **Create and Open build.sh**
+   ```bash
+   touch build.sh
+   chmod +x build.sh
+   ```
+
+2. **Complete build.sh Implementation**
+   Add the following content to build.sh:
    ```bash
    #!/bin/bash
+   # Script to build AESD Yocto image
+   
+   # Exit on error
+   set -e
+   
+   # Directory containing this script
+   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+   
+   # Initialize and update Poky submodule if needed
+   if [ ! -d "${SCRIPT_DIR}/poky" ]; then
+       git submodule init
+       git submodule update
+   fi
+   
+   # Source Yocto environment setup script
+   source poky/oe-init-build-env build
+   
+   # Add meta-aesd layer to bblayers.conf if not already present
+   if ! grep -q "meta-aesd" conf/bblayers.conf; then
+       bitbake-layers add-layer ../meta-aesd
+   fi
+   
+   # Configure MACHINE in local.conf if not already set
+   if ! grep -q "^MACHINE = \"qemuarm64\"" conf/local.conf; then
+       echo 'MACHINE = "qemuarm64"' >> conf/local.conf
+   fi
+   
+   # Add any additional configurations needed
+   if ! grep -q "CORE_IMAGE_EXTRA_INSTALL" conf/local.conf; then
+       echo 'CORE_IMAGE_EXTRA_INSTALL += "aesd-assignments"' >> conf/local.conf
+       echo 'CORE_IMAGE_EXTRA_INSTALL += "openssh"' >> conf/local.conf
+   fi
+   
+   # Build the image
+   bitbake core-image-aesd
    ```
-   - Create build.sh in the root directory
-   - Make it executable with `chmod +x build.sh`
-
-2. **Git Submodule Management**
-   - Initialize and update submodules for Poky and other dependencies
-   - This ensures all required Yocto components are present
-
-3. **Build Environment Setup**
-   - Source the Poky build environment
-   - This creates the build directory and configuration files
-
-4. **Machine Configuration**
-   - Set QEMU ARM64 as target machine
-   - Configure local.conf automatically
-
-5. **Layer Management**
-   - Add meta-aesd layer to the build
-   - Verify layer integration
-
-6. **Build Process**
-   - Trigger bitbake to build the custom image
-   - Handle errors appropriately
 
 ## Creating the meta-aesd Layer
 
-The meta-aesd layer is a crucial component that contains custom recipes and configurations for the AESD project. Here's how to create it from scratch:
+Let's create the meta-aesd layer with a complete step-by-step guide:
 
-1. **Create Layer Structure**
-   ```
-   meta-aesd/
-   ├── conf/
-   │   ├── layer.conf          # Layer configuration
-   │   └── machine/            # Machine-specific configurations
-   ├── recipes-aesd-assignments/
-   │   └── aesd-assignments/   # Custom application recipes
-   │       ├── aesd-assignments_git.bb
-   │       └── files/         # Patches and additional files
-   ├── recipes-misc-modules/   # Kernel module recipes
-   │   └── misc-modules/
-   │       ├── misc-modules_git.bb
-   │       └── files/
-   └── recipes-scull/         # Scull driver recipes
-       └── scull/
-           ├── scull_git.bb
-           └── files/
+1. **Create Base Directory Structure**
+   ```bash
+   mkdir -p meta-aesd/conf
+   mkdir -p meta-aesd/recipes-aesd-assignments/aesd-assignments
+   mkdir -p meta-aesd/recipes-aesd-assignments/images
+   mkdir -p meta-aesd/recipes-misc-modules/misc-modules
+   mkdir -p meta-aesd/recipes-scull/scull
    ```
 
-2. **Create Layer Configuration**
-   Create conf/layer.conf with:
+2. **Create Layer Configuration (meta-aesd/conf/layer.conf)**
+   Create the file with:
    ```bitbake
    # We have a conf and classes directory, add to BBPATH
    BBPATH .= ":${LAYERDIR}"
-
+   
    # We have recipes-* directories, add to BBFILES
    BBFILES += "${LAYERDIR}/recipes-*/*/*.bb \
                ${LAYERDIR}/recipes-*/*/*.bbappend"
-
+   
    BBFILE_COLLECTIONS += "meta-aesd"
    BBFILE_PATTERN_meta-aesd = "^${LAYERDIR}/"
    BBFILE_PRIORITY_meta-aesd = "6"
-
-   LAYERSERIES_COMPAT_meta-aesd = "hardknott kirkstone"
+   
+   LAYERDEPENDS_meta-aesd = "core"
+   LAYERSERIES_COMPAT_meta-aesd = "kirkstone"
    ```
 
-3. **Create Recipe Structure**
-   - **AESD Assignments Recipe**: Contains main application build instructions
-   - **Misc Modules Recipe**: Kernel module build configurations
-   - **Scull Driver Recipe**: Driver-specific build instructions
-
-4. **Layer Integration Steps**
-   a. **Initialize Layer**:
-      - Create base directories and configuration files
-      - Set up recipe hierarchies
+3. **Create Core Image Recipe (meta-aesd/recipes-aesd-assignments/images/core-image-aesd.bb)**
+   ```bitbake
+   SUMMARY = "A custom image for AESD assignments"
+   DESCRIPTION = "A custom image containing AESD assignment components"
    
-   b. **Configure Dependencies**:
-      - Add dependencies in layer.conf
-      - Configure machine-specific settings
+   inherit core-image
+   inherit extrausers
    
-   c. **Create Base Recipes**:
-      - Add core recipes for AESD applications
-      - Configure build and installation steps
+   CORE_IMAGE_EXTRA_INSTALL += "aesd-assignments"
+   CORE_IMAGE_EXTRA_INSTALL += "openssh"
+   
+   # Configure root password for development (not for production)
+   PASSWD = "\$5\$2WoxjAdaC2\$l4aj6Is.EWkD72Vt.byhM5qRtF9HcCM/5YpbxpmvNB5"
+   EXTRA_USERS_PARAMS = "usermod -p '${PASSWD}' root;"
+   
+   # Install kernel modules
+   IMAGE_INSTALL:append = " scull misc-modules"
+   ```
 
-5. **Layer Testing**
-   - Test layer integration
-   - Verify recipe builds
-   - Validate configurations
+4. **Create AESD Assignments Recipe (meta-aesd/recipes-aesd-assignments/aesd-assignments/aesd-assignments_git.bb)**
+   ```bitbake
+   SUMMARY = "AESD assignments"
+   LICENSE = "MIT"
+   LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+   
+   # Replace with your actual repository URL
+   SRC_URI = "git://git@github.com/your-username/your-repo.git;protocol=ssh;branch=master"
+   
+   PV = "1.0+git${SRCPV}"
+   SRCREV = "${AUTOREV}"
+   
+   S = "${WORKDIR}/git/server"
+   
+   inherit update-rc.d
+   
+   INITSCRIPT_PACKAGES = "${PN}"
+   INITSCRIPT_NAME:${PN} = "aesdsocket-start-stop.sh"
+   
+   FILES:${PN} += "${bindir}/aesdsocket"
+   FILES:${PN} += "${sysconfdir}/init.d/aesdsocket-start-stop.sh"
+   
+   TARGET_LDFLAGS += "-pthread -lrt"
+   
+   do_configure () {
+       :
+   }
+   
+   do_compile () {
+       oe_runmake
+   }
+   
+   do_install () {
+       install -d ${D}${bindir}
+       install -m 0755 ${S}/aesdsocket ${D}${bindir}/
+       
+       install -d ${D}${sysconfdir}/init.d
+       install -m 0755 ${S}/aesdsocket-start-stop.sh ${D}${sysconfdir}/init.d/
+   }
+   ```
+
+5. **Create Misc Modules Recipe (meta-aesd/recipes-misc-modules/misc-modules/misc-modules_git.bb)**
+   ```bitbake
+   inherit module
+   
+   SUMMARY = "Miscellaneous kernel modules for AESD assignments"
+   LICENSE = "MIT"
+   LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+   
+   # Replace with your actual repository URL
+   SRC_URI = "git://git@github.com/your-username/your-repo.git;protocol=ssh;branch=master"
+   
+   PV = "1.0+git${SRCPV}"
+   SRCREV = "${AUTOREV}"
+   
+   S = "${WORKDIR}/git/misc-modules"
+   
+   EXTRA_OEMAKE:append:task-install = " -C ${STAGING_KERNEL_DIR} M=${S}"
+   EXTRA_OEMAKE += "KERNELDIR=${STAGING_KERNEL_DIR}"
+   
+   inherit kernel-module-split
+   ```
+
+6. **Create Scull Driver Recipe (meta-aesd/recipes-scull/scull/scull_git.bb)**
+   ```bitbake
+   inherit module
+   
+   SUMMARY = "Scull driver for AESD assignments"
+   LICENSE = "MIT"
+   LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+   
+   # Replace with your actual repository URL
+   SRC_URI = "git://git@github.com/your-username/your-repo.git;protocol=ssh;branch=master"
+   
+   PV = "1.0+git${SRCPV}"
+   SRCREV = "${AUTOREV}"
+   
+   S = "${WORKDIR}/git/scull"
+   
+   EXTRA_OEMAKE:append:task-install = " -C ${STAGING_KERNEL_DIR} M=${S}"
+   EXTRA_OEMAKE += "KERNELDIR=${STAGING_KERNEL_DIR}"
+   
+   inherit kernel-module-split
+   ```
 
 ## Layer Integration with Yocto
 

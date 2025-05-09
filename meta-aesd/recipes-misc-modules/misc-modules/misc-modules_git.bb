@@ -15,8 +15,8 @@ INITSCRIPT_PARAMS = "start 98 5 . stop 20 0 1 6 ."
 
 EXTRA_OEMAKE += "KERNELDIR=${STAGING_KERNEL_DIR}"
 
-RPROVIDES:${PN} += "kernel-module-hello"
-RPROVIDES:${PN} += "kernel-module-faulty"
+RPROVIDES:${PN} += "kernel-module-hello-${KERNEL_VERSION}"
+RPROVIDES:${PN} += "kernel-module-faulty-${KERNEL_VERSION}"
 
 do_compile() {
     oe_runmake -C ${S}/misc-modules KERNELDIR=${STAGING_KERNEL_DIR}
@@ -28,7 +28,7 @@ do_install() {
     install -m 0644 ${S}/misc-modules/hello.ko ${D}${base_libdir}/modules/${KERNEL_VERSION}/extra/
     install -m 0644 ${S}/misc-modules/faulty.ko ${D}${base_libdir}/modules/${KERNEL_VERSION}/extra/
 
-    # Install module scripts in /usr/bin
+    # Install module scripts from the source repository
     install -d ${D}${bindir}
     install -m 0755 ${S}/misc-modules/module_load ${D}${bindir}/
     install -m 0755 ${S}/misc-modules/module_unload ${D}${bindir}/
@@ -41,5 +41,3 @@ do_install() {
 FILES:${PN} += "${base_libdir}/modules/${KERNEL_VERSION}/extra/*.ko"
 FILES:${PN} += "${bindir}/*"
 FILES:${PN} += "${sysconfdir}/init.d/S98lddmodules"
-
-KERNEL_MODULE_AUTOLOAD += "hello faulty"
